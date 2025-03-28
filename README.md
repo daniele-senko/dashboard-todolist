@@ -7,6 +7,24 @@
 ## 🚀 Visão Geral
 Sistema integrado de gerenciamento de tarefas com dashboard analítico desenvolvido com tecnologias modernas.
 
+## 🔍 Justificativa das Tecnologias Escolhidas
+
+### Vue.js 3 (Composition API)
+**Motivos principais**:
+- **Performance superior** com o novo sistema de reatividade
+- **Composition API** oferece melhor organização do código
+- **Tamanho reduzido** (20% menor que Vue 2)
+- **Melhor suporte a TypeScript**
+
+Exemplo de benefício:
+```javascript
+// Composição lógica reutilizável
+export function useTaskManager() {
+  const tasks = ref([])
+  const addTask = (task) => { /*...*/ }
+  return { tasks, addTask }
+}
+```
 ## 🛠️ Stack Tecnológico
 
 ### Core
@@ -36,14 +54,6 @@ Sistema integrado de gerenciamento de tarefas com dashboard analítico desenvolv
   - Edição inline
   - Exclusão com confirmação
 
-- **Organização**
-  ```mermaid
-  graph TD
-    A[Tarefas] --> B[Filtros]
-    B --> C[Status]
-    B --> D[Prioridade]
-    B --> E[Data]
-  ```
 
 ### Dashboard Interativo
 | Componente | Tecnologia | Dados |
@@ -70,19 +80,6 @@ src/
 ├── App.vue                # Componente raiz
 ├── main.js                # Ponto de entrada
 └── router.js              # Configuração de rotas
-```
-
-### Fluxo de Dados
-```mermaid
-sequenceDiagram
-    participant C as Componente
-    participant S as Store (Pinia)
-    participant A as API
-    
-    C->>S: dispatch('addTask', task)
-    S->>A: POST /tasks
-    A-->>S: 201 Created
-    S->>C: update reactive state
 ```
 
 ## 🚀 Como Executar
@@ -146,39 +143,6 @@ sequenceDiagram
 | VITE_API_URL | https://api.example.com | Não |
 | VITE_APP_ENV | production | Sim |
 
-## ⚠️ Desafios Técnicos
-
-### 1. Renderização de Gráficos
-**Problema**: Atualização lenta com muitos dados  
-**Solução**:
-```javascript
-// useChartOptimization.js
-export function useChartOptimization() {
-  const debouncedUpdate = useDebounceFn((chart) => {
-    chart.update()
-  }, 150)
-
-  return { debouncedUpdate }
-}
-```
-
-### 2. Estado Persistente
-**Problema**: Perda de estado ao atualizar  
-**Solução**:
-```javascript
-// taskStore.js
-const storedTasks = JSON.parse(localStorage.getItem('tasks')) || []
-state: () => ({ tasks: storedTasks })
-```
-
-### 3. Responsividade
-**Problema**: Quebras em mobile  
-**Solução Tailwind**:
-```html
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-  <!-- Cartões se ajustam automaticamente -->
-</div>
-```
 
 ## 🤝 Como Contribuir
 1. Faça um fork do projeto

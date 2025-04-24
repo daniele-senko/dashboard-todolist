@@ -76,8 +76,13 @@
       </div>
     </div>
 
+    <!-- Estado de carregamento -->
+    <div v-if="isLoading" class="text-center py-8">
+      <span class="animate-pulse">Carregando tarefas...</span>
+    </div>
+
     <!-- Lista de tarefas -->
-    <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+    <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
       <!-- Item de tarefa -->
       <li 
         v-for="task in filteredAndSortedTasks" 
@@ -85,7 +90,7 @@
         class="py-4 px-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
         :class="{
           'border-l-4 border-red-500': taskStore.isOverdue(task.dueDate, task.dueTime),
-          'border-l-4 border-blue-500': isDueToday(task.dueDate),
+          'border-l-4 border-blue-500': isDueToday(task.dueDate, task.dueTime),
           'border-l-4 border-yellow-500': task.priority === 'high',
           'opacity-70': task.completed
         }"
@@ -123,7 +128,7 @@
                   Atrasada
                 </span>
                 <span 
-                  v-else-if="isDueToday(task.dueDate)"
+                  v-else-if="isDueToday(task.dueDate, task.dueTime)"
                   class="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full"
                 >
                   Hoje
@@ -168,18 +173,28 @@
 
     <!-- Estado vazio -->
     <div 
-      v-if="filteredAndSortedTasks.length === 0" 
+      v-if="!isLoading && filteredAndSortedTasks.length === 0" 
       class="text-center py-8 text-gray-500 dark:text-gray-400"
     >
       <InboxIcon class="mx-auto h-12 w-12 opacity-50" />
       <p class="mt-2">Nenhuma tarefa encontrada</p>
       <p class="text-sm">Adicione novas tarefas usando o formulário acima</p>
     </div>
+
+    <!-- Botão para limpar todas as tarefas -->
+    <div class="flex justify-end mt-4" v-if="!isLoading && taskStore.tasks.length > 0">
+      <button 
+        @click="confirmClearAll"
+        class="text-sm text-red-500 hover:text-red-700 dark:hover:text-red-400"
+      >
+        Limpar todas as tarefas
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useTaskStore } from '../stores/taskStore';
 import {
   PlusIcon,
@@ -192,16 +207,24 @@ import {
 const taskStore = useTaskStore();
 
 // Refs para os dados do formulário
-const newTask = ref(''); // Texto da tarefa
-const dueDate = ref(''); // Data de vencimento
-const dueTime = ref(''); // Hora de vencimento
-const priority = ref('medium'); // Prioridade padrão
-const isEditing = ref(false); // Modo edição
-const editingTaskId = ref(null); // ID da tarefa sendo editada
+const newTask = ref('');
+const dueDate = ref('');
+const dueTime = ref('');
+const priority = ref('medium');
+const isEditing = ref(false);
+const editingTaskId = ref(null);
+const isLoading = ref(true);
 
 // Filtros e ordenação
-const currentFilter = ref('all'); // Filtro atual
-const currentSort = ref('newest'); // Ordenação atual
+const currentFilter = ref('all');
+const currentSort = ref('newest');
+
+onMounted(() => {
+  // Simula um pequeno delay para carregamento
+  setTimeout(() => {
+    isLoading.value = false;
+  }, 300);
+});
 
 /**
  * Obtém a data atual no formato YYYY-MM-DD
@@ -218,11 +241,26 @@ const getTodayDate = () => {
 /**
  * Verifica se a tarefa vence hoje
  * @param {string} date - Data no formato YYYY-MM-DD
+ * @param {string} time - Hora no formato HH:MM
  * @returns {boolean} True se a tarefa vence hoje
  */
-const isDueToday = (date) => {
+const isDueToday = (date, time = 'não definido') => {
   if (date === 'não definido' || !date) return false;
-  return date === getTodayDate();
+  
+  const today = getTodayDate();
+  if (date !== today) return false;
+  
+  // Se tem hora definida, verifica se já passou
+  if (time !== 'não definido') {
+    const now = new Date();
+    const [hours, minutes] = time.split(':');
+    const taskTime = new Date();
+    taskTime.setHours(hours, minutes, 0, 0);
+    
+    return now <= taskTime;
+  }
+  
+  return true;
 };
 
 /**
@@ -231,7 +269,6 @@ const isDueToday = (date) => {
  */
 const handleTimeChange = (event) => {
   if (event.target.value && !dueDate.value) {
-    // Se tem hora mas não tem data, usa a data atual
     dueDate.value = getTodayDate();
   }
   dueTime.value = event.target.value || '';
@@ -310,6 +347,15 @@ const resetForm = () => {
 };
 
 /**
+ * Confirma a limpeza de todas as tarefas
+ */
+const confirmClearAll = () => {
+  if (confirm('Tem certeza que deseja remover todas as tarefas? Esta ação não pode ser desfeita.')) {
+    taskStore.clearAllTasks();
+  }
+};
+
+/**
  * Filtra e ordena as tarefas conforme as seleções
  */
 const filteredAndSortedTasks = computed(() => {
@@ -327,29 +373,37 @@ const filteredAndSortedTasks = computed(() => {
       tasks = tasks.filter(task => taskStore.isOverdue(task.dueDate, task.dueTime));
       break;
     case 'today':
-      tasks = tasks.filter(task => isDueToday(task.dueDate));
+      tasks = tasks.filter(task => isDueToday(task.dueDate, task.dueTime));
       break;
   }
 
   // Aplica ordenação
   switch (currentSort.value) {
     case 'newest':
-      tasks.sort((a, b) => b.id - a.id); // Mais recentes primeiro
+      tasks.sort((a, b) => b.id - a.id);
       break;
     case 'oldest':
-      tasks.sort((a, b) => a.id - b.id); // Mais antigas primeiro
+      tasks.sort((a, b) => a.id - b.id);
       break;
     case 'dueDate':
       tasks.sort((a, b) => {
         if (a.dueDate === 'não definido' && b.dueDate === 'não definido') return 0;
-        if (a.dueDate === 'não definido') return 1; // Tarefas sem data vão para o final
+        if (a.dueDate === 'não definido') return 1;
         if (b.dueDate === 'não definido') return -1;
-        return new Date(a.dueDate) - new Date(b.dueDate); // Ordena por data
+        
+        const dateCompare = new Date(a.dueDate) - new Date(b.dueDate);
+        if (dateCompare !== 0) return dateCompare;
+        
+        if (a.dueTime === 'não definido' && b.dueTime === 'não definido') return 0;
+        if (a.dueTime === 'não definido') return 1;
+        if (b.dueTime === 'não definido') return -1;
+        
+        return a.dueTime.localeCompare(b.dueTime);
       });
       break;
     case 'priority':
-      const priorityOrder = { high: 3, medium: 2, low: 1 }; // Mapeamento de prioridades
-      tasks.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]); // Ordena por prioridade
+      const priorityOrder = { high: 3, medium: 2, low: 1 };
+      tasks.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
       break;
   }
 
